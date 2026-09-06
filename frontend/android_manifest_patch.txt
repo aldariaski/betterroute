@@ -1,0 +1,2 @@
+If your generated AndroidManifest.xml does not already contain it, add inside <manifest>:
+<uses-permission android:name="android.permission.INTERNET" />

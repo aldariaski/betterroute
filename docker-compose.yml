@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    container_name: betterroute-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: betterroute
+      POSTGRES_USER: betterroute
+      POSTGRES_PASSWORD: betterroute
+    ports:
+      - "5432:5432"
+    volumes:
+      - betterroute_pgdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+
+volumes:
+  betterroute_pgdata:

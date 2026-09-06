@@ -1,0 +1,17 @@
+name: betterroute
+description: BetterRoute merchant-to-buyer routing MVP.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.7.0 <4.0.0'
+  flutter: '>=3.29.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.5.0
+  maplibre_gl: ^0.27.0
+
+flutter:
+  uses-material-design: true

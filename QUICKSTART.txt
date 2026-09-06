@@ -1,0 +1,21 @@
+BETTERROUTE QUICK START (Windows)
+
+1. Install Docker Desktop, Go 1.23+ and Flutter 3.29+.
+2. Open PowerShell in this folder.
+3. Start DB:
+   docker compose up -d
+4. Configure backend:
+   copy backend\.env.example backend\.env
+   edit backend\.env and put your ORS_API_KEY.
+5. Run backend:
+   cd backend
+   go mod tidy
+   go run .\cmd\server
+6. In another terminal, create Flutter platform folders once:
+   cd frontend
+   flutter create --platforms=android,ios,web,windows .
+   flutter pub get
+   flutter run
+
+Android emulator uses http://10.0.2.2:8080.
+Physical Android device: edit frontend\lib\services\api.dart to your PC LAN IP.
