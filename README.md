@@ -2,7 +2,7 @@
 
 BetterRoute is an MVP for calculating the real driving distance and route between a buyer and a merchant.
 
-(image.png)
+![Dashboard Screenshot](image.png)
 
 ## Stack
 
