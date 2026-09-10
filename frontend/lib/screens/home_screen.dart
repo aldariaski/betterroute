@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/merchant.dart';
 import '../models/route_result.dart';
@@ -72,6 +73,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _openGithub() async {
+    final uri = Uri.parse('https://github.com/aldariaski');
+
+    try {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (e) {
+      setState(() {
+        error = 'Could not open GitHub';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final buyerLat = double.tryParse(lat.text) ?? -6.2;
@@ -96,7 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     route: result,
                   ),
                 ),
-
                 Container(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                   decoration: BoxDecoration(
@@ -120,13 +135,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       Row(
                         children: [
                           Expanded(
                             child: TextField(
                               controller: lat,
-                              keyboardType: const TextInputType.numberWithOptions(
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
                                 decimal: true,
                                 signed: true,
                               ),
@@ -135,13 +150,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
-
                           const SizedBox(width: 12),
-
                           Expanded(
                             child: TextField(
                               controller: lng,
-                              keyboardType: const TextInputType.numberWithOptions(
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
                                 decimal: true,
                                 signed: true,
                               ),
@@ -152,9 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 8),
-
                       DropdownButtonFormField<Merchant>(
                         value: selected,
                         decoration: const InputDecoration(
@@ -175,9 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           });
                         },
                       ),
-
                       const SizedBox(height: 12),
-
                       if (result != null)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -192,7 +202,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ),
-
                       if (error != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
@@ -203,15 +212,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
-
                       const SizedBox(height: 10),
-
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: _route,
                           icon: const Icon(Icons.route),
                           label: const Text('Calculate route'),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: InkWell(
+                          onTap: _openGithub,
+                          child: const Text(
+                            'Made by Yusuf Fakhri Aldrian (aldariaski)',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -242,4 +262,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-

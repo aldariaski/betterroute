@@ -31,6 +31,7 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
   Circle? _merchantCircle;
 
   bool _styleLoaded = false;
+  bool _routeSourceAdded = false;
   bool _updating = false;
 
   static const String _routeSourceId = 'route-source';
@@ -40,6 +41,7 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
   Widget build(BuildContext context) {
     return MapLibreMap(
       styleString: 'https://demotiles.maplibre.org/style.json',
+
       initialCameraPosition: CameraPosition(
         target: LatLng(
           widget.buyerLat,
@@ -47,15 +49,23 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
         ),
         zoom: 11,
       ),
-      onMapCreated: (controller) {
-        this.controller = controller;
+
+      onMapCreated: (c) {
+        controller = c;
       },
+
       onStyleLoadedCallback: _onStyleLoaded,
     );
   }
 
   Future<void> _onStyleLoaded() async {
     _styleLoaded = true;
+
+    // The style can be loaded again after the map/activity
+    // is recreated, so all style objects need to be recreated.
+    _buyerCircle = null;
+    _merchantCircle = null;
+    _routeSourceAdded = false;
 
     await _updateMap();
   }
@@ -68,8 +78,9 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
       return;
     }
 
-    // The widget itself is reused by Flutter.
-    // Update the existing MapLibre objects instead of recreating the map.
+    // HomeScreen changes the selected merchant or route.
+    // The MapLibreMap itself stays alive, but its contents
+    // need to be updated.
     _updateMap();
   }
 
@@ -103,9 +114,7 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
       widget.buyerLng,
     );
 
-    final existingCircle = _buyerCircle;
-
-    if (existingCircle == null) {
+    if (_buyerCircle == null) {
       _buyerCircle = await c.addCircle(
         CircleOptions(
           circleRadius: 7,
@@ -120,7 +129,7 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
     }
 
     await c.updateCircle(
-      existingCircle,
+      _buyerCircle!,
       CircleOptions(
         geometry: position,
       ),
@@ -132,7 +141,7 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
   ) async {
     final merchant = widget.merchant;
 
-    // No merchant selected.
+    // Nothing is selected.
     if (merchant == null) {
       if (_merchantCircle != null) {
         await c.removeCircle(_merchantCircle!);
@@ -147,10 +156,8 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
       merchant.longitude,
     );
 
-    final existingCircle = _merchantCircle;
-
     // First merchant marker.
-    if (existingCircle == null) {
+    if (_merchantCircle == null) {
       _merchantCircle = await c.addCircle(
         CircleOptions(
           circleRadius: 7,
@@ -164,9 +171,10 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
       return;
     }
 
-    // Update the existing merchant marker.
+    // Existing marker:
+    // move it to the newly selected merchant.
     await c.updateCircle(
-      existingCircle,
+      _merchantCircle!,
       CircleOptions(
         geometry: position,
       ),
@@ -178,22 +186,21 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
   ) async {
     final route = widget.route;
 
-    // No route:
-    // remove the existing route if one exists.
+    // If there is no route, remove the old route.
     if (route == null) {
       await _removeRoute(c);
       return;
     }
 
-    final geoJson = jsonEncode({
+    final geoJson = <String, dynamic>{
       'type': 'Feature',
       'geometry': route.geometry,
-      'properties': {},
-    });
+      'properties': <String, dynamic>{},
+    };
 
-    // If the route source/layer already exists,
-    // only update the GeoJSON data.
-    if (await _hasRouteSource(c)) {
+    // Route already exists:
+    // replace its GeoJSON without recreating the map.
+    if (_routeSourceAdded) {
       await c.setGeoJsonSource(
         _routeSourceId,
         geoJson,
@@ -206,7 +213,7 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
     await c.addSource(
       _routeSourceId,
       GeojsonSourceProperties(
-        data: geoJson,
+        data: jsonEncode(geoJson),
       ),
     );
 
@@ -218,34 +225,32 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
         lineWidth: 5,
         lineOpacity: 0.85,
       ),
+      enableInteraction: false,
     );
-  }
 
-  Future<bool> _hasRouteSource(
-    MapLibreMapController c,
-  ) async {
-    try {
-      final source = await c.getSource(_routeSourceId);
-      return source != null;
-    } catch (_) {
-      return false;
-    }
+    _routeSourceAdded = true;
   }
 
   Future<void> _removeRoute(
     MapLibreMapController c,
   ) async {
+    if (!_routeSourceAdded) {
+      return;
+    }
+
     try {
       await c.removeLayer(_routeLayerId);
     } catch (_) {
-      // Layer doesn't exist.
+      // Layer may already have been removed.
     }
 
     try {
       await c.removeSource(_routeSourceId);
     } catch (_) {
-      // Source doesn't exist.
+      // Source may already have been removed.
     }
+
+    _routeSourceAdded = false;
   }
 
   @override
@@ -257,3 +262,4 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
     super.dispose();
   }
 }
+
