@@ -168,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<Merchant>(
-                        value: selected,
+                        initialValue: selected,
                         decoration: const InputDecoration(
                           labelText: 'Merchant',
                         ),
