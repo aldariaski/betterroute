@@ -14,35 +14,32 @@ Returns one merchant.
 
 ## POST /api/merchants
 
-Body:
+Creates a merchant with `name`, `address`, `latitude`, and `longitude`.
 
-```json
-{
-  "name": "Example Merchant",
-  "address": "Jakarta",
-  "latitude": -6.2,
-  "longitude": 106.8
-}
-```
+## GET /api/places/search?q=...
+
+Searches OpenRouteService geocoding results, limited to Indonesia. Queries must contain 3–160 characters. Returns up to six places with name, address, latitude, and longitude. The ORS API key stays on the server.
 
 ## GET /api/route
 
 Query parameters:
 
-- `buyer_lat`
-- `buyer_lng`
-- `merchant_lat`
-- `merchant_lng`
+- `origin_lat`, `origin_lng`
+- `destination_lat`, `destination_lng`
 
-Response:
+Returns route alternatives, each with `distance_km`, `duration_minutes`, GeoJSON `geometry`, and `steps`. Each step has `instruction`, `name`, `distance_m`, `duration_s`, and provider maneuver `type`.
 
 ```json
 {
-  "distance_km": 4.8,
-  "duration_minutes": 18,
-  "geometry": {
-    "type": "LineString",
-    "coordinates": [[106.8,-6.2],[106.81,-6.19]]
-  }
+  "routes": [
+    {
+      "distance_km": 4.8,
+      "duration_minutes": 18,
+      "geometry": { "type": "LineString", "coordinates": [[106.8, -6.2], [106.81, -6.19]] },
+      "steps": [{ "instruction": "Head northeast", "name": "Example Street", "distance_m": 350, "duration_s": 45, "type": 11 }]
+    }
+  ]
 }
 ```
+
+The route ETA is the routing provider's estimate. Live traffic adjustment and background navigation are not currently supplied by the API.

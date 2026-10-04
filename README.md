@@ -67,7 +67,7 @@ http://localhost:8080/api/merchants
 Example route:
 
 ```text
-http://localhost:8080/api/route?buyer_lat=-6.2&buyer_lng=106.8166&merchant_lat=-6.175392&merchant_lng=106.827153
+http://localhost:8080/api/route?origin_lat=-6.2&origin_lng=106.8166&destination_lat=-6.175392&destination_lng=106.827153
 ```
 
 ## 4. Run Flutter
@@ -82,20 +82,23 @@ flutter run
 
 For a physical phone, change `baseUrl` in `frontend/lib/services/api.dart` to the LAN address of the computer running the Go server.
 
-## MVP flow
+## Current trip-planning flow
 
-1. Buyer coordinates are entered.
-2. A merchant is selected.
-3. Flutter calls the Go API.
-4. Go calls OpenRouteService.
-5. OpenRouteService returns a GeoJSON road route, distance and duration.
-6. Go returns only the data needed by the app.
-7. Flutter displays the merchant/buyer points and route polyline.
+1. The user searches for an origin and destination, or uses the current location as origin.
+2. Flutter calls Go for place suggestions and driving routes.
+3. Go proxies OpenRouteService geocoding and directions so the key stays server-side.
+4. The route response includes alternative routes, maneuver instructions, distance, ETA, and GeoJSON geometry.
+5. Flutter displays route choices, fits the selected route to the map, and shows a directions list.
+6. Foreground navigation preview follows GPS position and requests a new route when the device is sufficiently far from the selected route.
+
+Geocoding is currently restricted to Indonesia. Directions and search require a configured `ORS_API_KEY`. Live traffic ETA and background navigation are not yet implemented.
 
 ## Production next steps
 
 - Add authentication and users.
-- Add address search/geocoding instead of manual coordinates.
+- Add persistent route caching, provider-usage safeguards and structured observability.
+- Add background navigation with platform-specific lifecycle and permission handling.
+- Evaluate a traffic-aware routing provider for refreshed ETA and traffic-based alternatives.
 - Add merchant CRUD UI.
 - Cache route results to reduce routing API calls.
 - Add nearest-merchant queries using PostGIS.

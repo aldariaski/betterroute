@@ -1,23 +1,26 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
-
-import '../models/merchant.dart';
 import '../models/route_result.dart';
 
 class BetterRouteMap extends StatefulWidget {
-  final Merchant? merchant;
-  final double buyerLat;
-  final double buyerLng;
+  final double originLat;
+  final double originLng;
+  final double destinationLat;
+  final double destinationLng;
+  final LatLng? livePosition;
   final RouteResult? route;
+  final int routeIndex;
 
   const BetterRouteMap({
     super.key,
-    required this.merchant,
-    required this.buyerLat,
-    required this.buyerLng,
+    required this.originLat,
+    required this.originLng,
+    required this.destinationLat,
+    required this.destinationLng,
+    required this.livePosition,
     required this.route,
+    required this.routeIndex,
   });
 
   @override
@@ -26,200 +29,125 @@ class BetterRouteMap extends StatefulWidget {
 
 class _BetterRouteMapState extends State<BetterRouteMap> {
   MapLibreMapController? controller;
-
-  Circle? _buyerCircle;
-  Circle? _merchantCircle;
-
+  Circle? _originCircle;
+  Circle? _destinationCircle;
+  Circle? _liveCircle;
   bool _styleLoaded = false;
   bool _routeSourceAdded = false;
   bool _updating = false;
-
-  static const String _routeSourceId = 'route-source';
-  static const String _routeLayerId = 'route-layer';
+  static const String _sourceId = 'route-source';
+  static const String _layerId = 'route-layer';
 
   @override
-  Widget build(BuildContext context) {
-    return MapLibreMap(
-      styleString: 'https://demotiles.maplibre.org/style.json',
-
-      initialCameraPosition: CameraPosition(
-        target: LatLng(
-          widget.buyerLat,
-          widget.buyerLng,
-        ),
-        zoom: 11,
-      ),
-
-      onMapCreated: (c) {
-        controller = c;
-      },
-
-      onStyleLoadedCallback: _onStyleLoaded,
-    );
-  }
+  Widget build(BuildContext context) => MapLibreMap(
+    styleString: 'https://demotiles.maplibre.org/style.json',
+    initialCameraPosition: CameraPosition(
+      target: LatLng(widget.originLat, widget.originLng),
+      zoom: 12,
+    ),
+    onMapCreated: (c) => controller = c,
+    onStyleLoadedCallback: _onStyleLoaded,
+  );
 
   Future<void> _onStyleLoaded() async {
     _styleLoaded = true;
-
-    // The style can be loaded again after the map/activity
-    // is recreated, so all style objects need to be recreated.
-    _buyerCircle = null;
-    _merchantCircle = null;
+    _originCircle = null;
+    _destinationCircle = null;
+    _liveCircle = null;
     _routeSourceAdded = false;
-
-    await _updateMap();
+    await _updateMap(fit: true);
   }
 
   @override
   void didUpdateWidget(covariant BetterRouteMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    if (!_styleLoaded) {
-      return;
-    }
-
-    // HomeScreen changes the selected merchant or route.
-    // The MapLibreMap itself stays alive, but its contents
-    // need to be updated.
-    _updateMap();
+    if (!_styleLoaded) return;
+    final routeChanged =
+        oldWidget.route != widget.route ||
+        oldWidget.routeIndex != widget.routeIndex;
+    _updateMap(fit: routeChanged);
   }
 
-  Future<void> _updateMap() async {
-    if (_updating) {
-      return;
-    }
-
+  Future<void> _updateMap({bool fit = false}) async {
     final c = controller;
-
-    if (c == null || !_styleLoaded) {
-      return;
-    }
-
+    if (_updating || c == null || !_styleLoaded) return;
     _updating = true;
-
     try {
-      await _updateBuyerMarker(c);
-      await _updateMerchantMarker(c);
+      await _updateCircle(
+        c,
+        _originCircle,
+        LatLng(widget.originLat, widget.originLng),
+        '#2563EB',
+        (v) => _originCircle = v,
+      );
+      await _updateCircle(
+        c,
+        _destinationCircle,
+        LatLng(widget.destinationLat, widget.destinationLng),
+        '#16A34A',
+        (v) => _destinationCircle = v,
+      );
+      if (widget.livePosition != null) {
+        await _updateCircle(
+          c,
+          _liveCircle,
+          widget.livePosition!,
+          '#F97316',
+          (v) => _liveCircle = v,
+          radius: 9,
+        );
+      }
       await _updateRoute(c);
+      if (fit && widget.route != null) await _fitRoute(c);
     } finally {
       _updating = false;
     }
   }
 
-  Future<void> _updateBuyerMarker(
+  Future<void> _updateCircle(
     MapLibreMapController c,
-  ) async {
-    final position = LatLng(
-      widget.buyerLat,
-      widget.buyerLng,
-    );
-
-    if (_buyerCircle == null) {
-      _buyerCircle = await c.addCircle(
-        CircleOptions(
-          circleRadius: 7,
-          circleColor: '#2563EB',
-          circleStrokeColor: '#FFFFFF',
-          circleStrokeWidth: 2,
-          geometry: position,
+    Circle? circle,
+    LatLng at,
+    String color,
+    void Function(Circle?) save, {
+    double radius = 7,
+  }) async {
+    if (circle == null) {
+      save(
+        await c.addCircle(
+          CircleOptions(
+            circleRadius: radius,
+            circleColor: color,
+            circleStrokeColor: '#FFFFFF',
+            circleStrokeWidth: 2,
+            geometry: at,
+          ),
         ),
       );
-
-      return;
+    } else {
+      await c.updateCircle(circle, CircleOptions(geometry: at));
     }
-
-    await c.updateCircle(
-      _buyerCircle!,
-      CircleOptions(
-        geometry: position,
-      ),
-    );
   }
 
-  Future<void> _updateMerchantMarker(
-    MapLibreMapController c,
-  ) async {
-    final merchant = widget.merchant;
-
-    // Nothing is selected.
-    if (merchant == null) {
-      if (_merchantCircle != null) {
-        await c.removeCircle(_merchantCircle!);
-        _merchantCircle = null;
-      }
-
-      return;
-    }
-
-    final position = LatLng(
-      merchant.latitude,
-      merchant.longitude,
-    );
-
-    // First merchant marker.
-    if (_merchantCircle == null) {
-      _merchantCircle = await c.addCircle(
-        CircleOptions(
-          circleRadius: 7,
-          circleColor: '#16A34A',
-          circleStrokeColor: '#FFFFFF',
-          circleStrokeWidth: 2,
-          geometry: position,
-        ),
-      );
-
-      return;
-    }
-
-    // Existing marker:
-    // move it to the newly selected merchant.
-    await c.updateCircle(
-      _merchantCircle!,
-      CircleOptions(
-        geometry: position,
-      ),
-    );
-  }
-
-  Future<void> _updateRoute(
-    MapLibreMapController c,
-  ) async {
+  Future<void> _updateRoute(MapLibreMapController c) async {
     final route = widget.route;
-
-    // If there is no route, remove the old route.
     if (route == null) {
       await _removeRoute(c);
       return;
     }
-
-    final geoJson = <String, dynamic>{
+    final geoJson = jsonEncode({
       'type': 'Feature',
       'geometry': route.geometry,
-      'properties': <String, dynamic>{},
-    };
-
-    // Route already exists:
-    // replace its GeoJSON without recreating the map.
+      'properties': {},
+    });
     if (_routeSourceAdded) {
-      await c.setGeoJsonSource(
-        _routeSourceId,
-        geoJson,
-      );
-
+      await c.setGeoJsonSource(_sourceId, geoJson);
       return;
     }
-
-    // First route.
-    await c.addSource(
-      _routeSourceId,
-      GeojsonSourceProperties(
-        data: jsonEncode(geoJson),
-      ),
-    );
-
+    await c.addSource(_sourceId, GeojsonSourceProperties(data: geoJson));
     await c.addLineLayer(
-      _routeSourceId,
-      _routeLayerId,
+      _sourceId,
+      _layerId,
       LineLayerProperties(
         lineColor: '#2563EB',
         lineWidth: 5,
@@ -227,39 +155,53 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
       ),
       enableInteraction: false,
     );
-
     _routeSourceAdded = true;
   }
 
-  Future<void> _removeRoute(
-    MapLibreMapController c,
-  ) async {
-    if (!_routeSourceAdded) {
-      return;
+  Future<void> _fitRoute(MapLibreMapController c) async {
+    final coordinates = widget.route?.geometry['coordinates'] as List?;
+    if (coordinates == null || coordinates.isEmpty) return;
+    var minLat = 90.0, maxLat = -90.0, minLng = 180.0, maxLng = -180.0;
+    for (final point in coordinates) {
+      final p = point as List;
+      final lng = (p[0] as num).toDouble(), lat = (p[1] as num).toDouble();
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
     }
+    if (minLat == maxLat && minLng == maxLng) return;
+    await c.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat, minLng),
+          northeast: LatLng(maxLat, maxLng),
+        ),
+        left: 48,
+        top: 64,
+        right: 48,
+        bottom: 260,
+      ),
+    );
+  }
 
+  Future<void> _removeRoute(MapLibreMapController c) async {
+    if (!_routeSourceAdded) return;
     try {
-      await c.removeLayer(_routeLayerId);
-    } catch (_) {
-      // Layer may already have been removed.
-    }
-
+      await c.removeLayer(_layerId);
+    } catch (_) {}
     try {
-      await c.removeSource(_routeSourceId);
-    } catch (_) {
-      // Source may already have been removed.
-    }
-
+      await c.removeSource(_sourceId);
+    } catch (_) {}
     _routeSourceAdded = false;
   }
 
   @override
   void dispose() {
-    _buyerCircle = null;
-    _merchantCircle = null;
+    _originCircle = null;
+    _destinationCircle = null;
+    _liveCircle = null;
     controller = null;
-
     super.dispose();
   }
 }
-

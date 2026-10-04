@@ -39,10 +39,13 @@ func main() {
 	g.GET("/api/merchants/:id", h.GetMerchant)
 	g.POST("/api/merchants", h.CreateMerchant)
 	g.GET("/api/route", h.Route)
+	g.GET("/api/places/search", h.SearchPlaces)
 
 	port := cfg.Port
 	log.Printf("BetterRoute API listening on http://localhost:%s", port)
-	if err := g.Run(":" + port); err != nil { log.Fatal(err) }
+	if err := g.Run(":" + port); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func cors() gin.HandlerFunc {
@@ -50,7 +53,10 @@ func cors() gin.HandlerFunc {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		if c.Request.Method == "OPTIONS" { c.AbortWithStatus(204); return }
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
 		c.Next()
 	}
 }
