@@ -1,11 +1,20 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/merchant.dart';
 import '../models/route_result.dart';
 
 class ApiService {
   final String baseUrl;
-  ApiService({this.baseUrl = 'http://10.0.2.2:8080'});
+  ApiService({String? baseUrl}) : baseUrl = baseUrl ?? _defaultBaseUrl;
+
+  static String get _defaultBaseUrl {
+    if (kIsWeb) return 'http://localhost:8080';
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8080';
+    }
+    return 'http://localhost:8080';
+  }
 
   Future<List<Merchant>> merchants() async {
     final r = await http.get(Uri.parse('$baseUrl/api/merchants'));

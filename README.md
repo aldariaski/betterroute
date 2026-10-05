@@ -4,6 +4,8 @@ BetterRoute is an MVP for calculating the real driving distance and route betwee
 
 ![Dashboard Screenshot](image.png)
 ![Dashboard Screenshot](image copy.png)
+![Dashboard Screenshot](Screenshot (5164).png)
+![Dashboard Screenshot](Screenshot (5165).png)
 
 ## Stack
 

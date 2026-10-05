@@ -455,6 +455,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                     onSelect: (p) => _selectPlace(p, false),
                   ),
+                  const SizedBox(height: 16),
                   if (error != null)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 5),

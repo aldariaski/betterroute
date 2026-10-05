@@ -135,16 +135,16 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
       await _removeRoute(c);
       return;
     }
-    final geoJson = jsonEncode({
+    final geoJson = <String, dynamic>{
       'type': 'Feature',
       'geometry': route.geometry,
       'properties': {},
-    });
+    };
     if (_routeSourceAdded) {
       await c.setGeoJsonSource(_sourceId, geoJson);
       return;
     }
-    await c.addSource(_sourceId, GeojsonSourceProperties(data: geoJson));
+    await c.addSource(_sourceId, GeojsonSourceProperties(data: jsonEncode(geoJson)));
     await c.addLineLayer(
       _sourceId,
       _layerId,
