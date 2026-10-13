@@ -28,6 +28,23 @@ class BetterRouteMap extends StatefulWidget {
 }
 
 class _BetterRouteMapState extends State<BetterRouteMap> {
+  static const String _styleJson = '''
+  {
+    "version": 8,
+    "sources": {
+      "openstreetmap": {
+        "type": "raster",
+        "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+        "tileSize": 256,
+        "attribution": "© OpenStreetMap contributors"
+      }
+    },
+    "layers": [
+      {"id": "osm-roads-map", "type": "raster", "source": "openstreetmap", "minzoom": 0, "maxzoom": 19}
+    ]
+  }
+  ''';
+
   MapLibreMapController? controller;
   Circle? _originCircle;
   Circle? _destinationCircle;
@@ -36,11 +53,12 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
   bool _routeSourceAdded = false;
   bool _updating = false;
   static const String _sourceId = 'route-source';
+  static const String _casingLayerId = 'route-casing-layer';
   static const String _layerId = 'route-layer';
 
   @override
   Widget build(BuildContext context) => MapLibreMap(
-    styleString: 'https://demotiles.maplibre.org/style.json',
+    styleString: _styleJson,
     initialCameraPosition: CameraPosition(
       target: LatLng(widget.originLat, widget.originLng),
       zoom: 12,
@@ -147,11 +165,25 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
     await c.addSource(_sourceId, GeojsonSourceProperties(data: jsonEncode(geoJson)));
     await c.addLineLayer(
       _sourceId,
+      _casingLayerId,
+      LineLayerProperties(
+        lineColor: '#FFFFFF',
+        lineWidth: 10,
+        lineOpacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round',
+      ),
+      enableInteraction: false,
+    );
+    await c.addLineLayer(
+      _sourceId,
       _layerId,
       LineLayerProperties(
-        lineColor: '#2563EB',
-        lineWidth: 5,
-        lineOpacity: 0.85,
+        lineColor: '#1463F3',
+        lineWidth: 6,
+        lineOpacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round',
       ),
       enableInteraction: false,
     );
@@ -189,6 +221,9 @@ class _BetterRouteMapState extends State<BetterRouteMap> {
     if (!_routeSourceAdded) return;
     try {
       await c.removeLayer(_layerId);
+    } catch (_) {}
+    try {
+      await c.removeLayer(_casingLayerId);
     } catch (_) {}
     try {
       await c.removeSource(_sourceId);
