@@ -9,9 +9,9 @@ class ApiService {
   ApiService({String? baseUrl}) : baseUrl = baseUrl ?? _defaultBaseUrl;
 
   static String get _defaultBaseUrl {
-    if (kIsWeb) return 'http://localhost:8080';
+    if (kIsWeb) return 'https://betterroute-ten.vercel.app';
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8080';
+      return 'https://betterroute-ten.vercel.app';
     }
     return 'http://localhost:8080';
   }

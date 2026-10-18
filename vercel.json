@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd frontend && flutter pub get && flutter build web --release",
+  "outputDirectory": "frontend/build/web",
+  "framework": null
+}
