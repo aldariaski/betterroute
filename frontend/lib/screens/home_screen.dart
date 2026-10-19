@@ -526,6 +526,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                     ],
                   ],
+                  const Padding(
+                    padding: EdgeInsets.only(top: 20, bottom: 12),
+                    child: Center(
+                      child: Text(
+                        '(C) 2026 Created by Yusuf Fakhri Aldrian',
+                        style: TextStyle(color: Colors.black54, fontSize: 12),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
