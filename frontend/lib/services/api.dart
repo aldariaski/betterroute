@@ -13,7 +13,7 @@ class ApiService {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return 'https://betterroute-ten.vercel.app';
     }
-    return 'http://localhost:8080';
+    return 'https://betterroute-ten.vercel.app';
   }
 
   Future<List<Merchant>> merchants() async {
