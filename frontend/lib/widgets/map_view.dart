@@ -1,6 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/route_result.dart';
 
 class BetterRouteMap extends StatefulWidget {
@@ -28,215 +29,138 @@ class BetterRouteMap extends StatefulWidget {
 }
 
 class _BetterRouteMapState extends State<BetterRouteMap> {
-  static const String _styleJson = '''
-  {
-    "version": 8,
-    "sources": {
-      "openstreetmap": {
-        "type": "raster",
-        "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-        "tileSize": 256,
-        "attribution": "© OpenStreetMap contributors"
-      }
-    },
-    "layers": [
-      {"id": "osm-roads-map", "type": "raster", "source": "openstreetmap", "minzoom": 0, "maxzoom": 19}
-    ]
-  }
-  ''';
-
-  MapLibreMapController? controller;
-  Circle? _originCircle;
-  Circle? _destinationCircle;
-  Circle? _liveCircle;
-  bool _styleLoaded = false;
-  bool _routeSourceAdded = false;
-  bool _updating = false;
-  static const String _sourceId = 'route-source';
-  static const String _casingLayerId = 'route-casing-layer';
-  static const String _layerId = 'route-layer';
-
-  @override
-  Widget build(BuildContext context) => MapLibreMap(
-    styleString: _styleJson,
-    initialCameraPosition: CameraPosition(
-      target: LatLng(widget.originLat, widget.originLng),
-      zoom: 12,
-    ),
-    onMapCreated: (c) => controller = c,
-    onStyleLoadedCallback: _onStyleLoaded,
-  );
-
-  Future<void> _onStyleLoaded() async {
-    _styleLoaded = true;
-    _originCircle = null;
-    _destinationCircle = null;
-    _liveCircle = null;
-    _routeSourceAdded = false;
-    await _updateMap(fit: true);
-  }
+  final MapController _mapController = MapController();
+  bool _mapReady = false;
 
   @override
   void didUpdateWidget(covariant BetterRouteMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_styleLoaded) return;
+    if (!_mapReady) return;
+
     final routeChanged =
         oldWidget.route != widget.route ||
         oldWidget.routeIndex != widget.routeIndex;
-    _updateMap(fit: routeChanged);
+    if (routeChanged && widget.route != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fitRoute());
+    } else if (oldWidget.originLat != widget.originLat ||
+        oldWidget.originLng != widget.originLng) {
+      _mapController.move(LatLng(widget.originLat, widget.originLng), 12);
+    }
   }
 
-  Future<void> _updateMap({bool fit = false}) async {
-    final c = controller;
-    if (_updating || c == null || !_styleLoaded) return;
-    _updating = true;
-    try {
-      await _updateCircle(
-        c,
-        _originCircle,
-        LatLng(widget.originLat, widget.originLng),
-        '#2563EB',
-        (v) => _originCircle = v,
-      );
-      await _updateCircle(
-        c,
-        _destinationCircle,
-        LatLng(widget.destinationLat, widget.destinationLng),
-        '#16A34A',
-        (v) => _destinationCircle = v,
-      );
-      if (widget.livePosition != null) {
-        await _updateCircle(
-          c,
-          _liveCircle,
-          widget.livePosition!,
-          '#F97316',
-          (v) => _liveCircle = v,
-          radius: 9,
-        );
+  void _onMapReady() {
+    _mapReady = true;
+    if (widget.route != null) _fitRoute();
+  }
+
+  void _fitRoute() {
+    final coordinates = widget.route?.geometry['coordinates'];
+    if (coordinates is! List || coordinates.isEmpty) return;
+
+    final points = <LatLng>[];
+    for (final coordinate in coordinates) {
+      if (coordinate is! List || coordinate.length < 2) continue;
+      final lng = coordinate[0];
+      final lat = coordinate[1];
+      if (lng is num && lat is num) {
+        points.add(LatLng(lat.toDouble(), lng.toDouble()));
       }
-      await _updateRoute(c);
-      if (fit && widget.route != null) await _fitRoute(c);
-    } finally {
-      _updating = false;
     }
+    if (points.length < 2) return;
+
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: points,
+        padding: const EdgeInsets.all(40),
+        maxZoom: 16,
+      ),
+    );
   }
 
-  Future<void> _updateCircle(
-    MapLibreMapController c,
-    Circle? circle,
-    LatLng at,
-    String color,
-    void Function(Circle?) save, {
-    double radius = 7,
-  }) async {
-    if (circle == null) {
-      save(
-        await c.addCircle(
-          CircleOptions(
-            circleRadius: radius,
-            circleColor: color,
-            circleStrokeColor: '#FFFFFF',
-            circleStrokeWidth: 2,
-            geometry: at,
+  List<LatLng> _routePoints() {
+    final coordinates = widget.route?.geometry['coordinates'];
+    if (coordinates is! List) return const [];
+
+    return [
+      for (final coordinate in coordinates)
+        if (coordinate is List &&
+            coordinate.length >= 2 &&
+            coordinate[0] is num &&
+            coordinate[1] is num)
+          LatLng(
+            (coordinate[1] as num).toDouble(),
+            (coordinate[0] as num).toDouble(),
           ),
-        ),
-      );
-    } else {
-      await c.updateCircle(circle, CircleOptions(geometry: at));
-    }
-  }
-
-  Future<void> _updateRoute(MapLibreMapController c) async {
-    final route = widget.route;
-    if (route == null) {
-      await _removeRoute(c);
-      return;
-    }
-    final geoJson = <String, dynamic>{
-      'type': 'Feature',
-      'geometry': route.geometry,
-      'properties': {},
-    };
-    if (_routeSourceAdded) {
-      await c.setGeoJsonSource(_sourceId, geoJson);
-      return;
-    }
-    await c.addSource(_sourceId, GeojsonSourceProperties(data: jsonEncode(geoJson)));
-    await c.addLineLayer(
-      _sourceId,
-      _casingLayerId,
-      LineLayerProperties(
-        lineColor: '#FFFFFF',
-        lineWidth: 10,
-        lineOpacity: 0.95,
-        lineCap: 'round',
-        lineJoin: 'round',
-      ),
-      enableInteraction: false,
-    );
-    await c.addLineLayer(
-      _sourceId,
-      _layerId,
-      LineLayerProperties(
-        lineColor: '#1463F3',
-        lineWidth: 6,
-        lineOpacity: 1,
-        lineCap: 'round',
-        lineJoin: 'round',
-      ),
-      enableInteraction: false,
-    );
-    _routeSourceAdded = true;
-  }
-
-  Future<void> _fitRoute(MapLibreMapController c) async {
-    final coordinates = widget.route?.geometry['coordinates'] as List?;
-    if (coordinates == null || coordinates.isEmpty) return;
-    var minLat = 90.0, maxLat = -90.0, minLng = 180.0, maxLng = -180.0;
-    for (final point in coordinates) {
-      final p = point as List;
-      final lng = (p[0] as num).toDouble(), lat = (p[1] as num).toDouble();
-      if (lat < minLat) minLat = lat;
-      if (lat > maxLat) maxLat = lat;
-      if (lng < minLng) minLng = lng;
-      if (lng > maxLng) maxLng = lng;
-    }
-    if (minLat == maxLat && minLng == maxLng) return;
-    await c.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(minLat, minLng),
-          northeast: LatLng(maxLat, maxLng),
-        ),
-        left: 48,
-        top: 64,
-        right: 48,
-        bottom: 260,
-      ),
-    );
-  }
-
-  Future<void> _removeRoute(MapLibreMapController c) async {
-    if (!_routeSourceAdded) return;
-    try {
-      await c.removeLayer(_layerId);
-    } catch (_) {}
-    try {
-      await c.removeLayer(_casingLayerId);
-    } catch (_) {}
-    try {
-      await c.removeSource(_sourceId);
-    } catch (_) {}
-    _routeSourceAdded = false;
+    ];
   }
 
   @override
-  void dispose() {
-    _originCircle = null;
-    _destinationCircle = null;
-    _liveCircle = null;
-    controller = null;
-    super.dispose();
+  Widget build(BuildContext context) {
+    final markers = <Marker>[
+      _marker(LatLng(widget.originLat, widget.originLng), Colors.blue),
+      _marker(
+        LatLng(widget.destinationLat, widget.destinationLng),
+        Colors.green,
+      ),
+      if (widget.livePosition != null)
+        _marker(widget.livePosition!, Colors.deepOrange, size: 20),
+    ];
+    final routePoints = _routePoints();
+
+    return FlutterMap(
+      mapController: _mapController,
+      options: MapOptions(
+        initialCenter: LatLng(widget.originLat, widget.originLng),
+        initialZoom: 12,
+        onMapReady: _onMapReady,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'com.example.betterroute',
+          maxNativeZoom: 19,
+        ),
+        if (routePoints.length > 1)
+          PolylineLayer(
+            polylines: [
+              Polyline(
+                points: routePoints,
+                color: Colors.white.withValues(alpha: 0.95),
+                strokeWidth: 10,
+                borderColor: Colors.white,
+              ),
+              Polyline(
+                points: routePoints,
+                color: const Color(0xFF1463F3),
+                strokeWidth: 6,
+              ),
+            ],
+          ),
+        MarkerLayer(markers: markers),
+        RichAttributionWidget(
+          alignment: AttributionAlignment.bottomRight,
+          attributions: [
+            TextSourceAttribution(
+              '© OpenStreetMap contributors',
+              onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
+            ),
+          ],
+        ),
+      ],
+    );
   }
+
+  Marker _marker(LatLng point, Color color, {double size = 18}) => Marker(
+    point: point,
+    width: size,
+    height: size,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3)],
+      ),
+    ),
+  );
 }
